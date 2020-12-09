@@ -3,79 +3,10 @@ import java.util.*;
 public class PM{
     Vector<PCB> processList; //包括所有创建过的进程
     PCB[] readyListHeads; //三个优先级的链表
-    //PCB blockListHead;//阻塞的链表
-    // 实际上也是四个RCB的阻塞链表，因为这里只因为缺少资源而阻塞
     int runningPriority;//readyList's head is running
-    TreeMap<String,RCB> resMap = new TreeMap<>();//Rname名字到RCB的映射
+    TreeMap<String,RCB> resMap = new TreeMap<>();//RName名字到RCB的映射
     TreeMap<Integer,String> status = new TreeMap();//Status映射状态名以便用户阅读
 
-
-    PCB getRunningP(){
-        PCB p = readyListHeads[runningPriority];
-        //某就绪队列第一个进程正在运行
-        if(p.Status==2){
-            return p;
-        }else{
-            //System.out.println("getRunningP error:no running");
-            return null;
-        }
-    }
-
-    void insertAtLast(PCB p){
-        p.Status = 1;
-        p.next=null;
-        int priority=p.priority;
-        PCB ptr = readyListHeads[priority];
-        if(ptr==null){
-            readyListHeads[priority]=p;
-        }
-        else{
-            while(ptr.next!=null){
-                ptr=ptr.next;
-            }
-            ptr.next=p;
-        }
-    }
-    void preempt(PCB running,PCB toRun){
-        //由于选择的toRun一定是该就绪队列第一个就绪的，所以PM的就绪队列不需调整顺序
-        //PCB status变化
-        if(running!=null)running.Status=1;
-        toRun.Status=2;
-        //PM更新runningPriority的唯一途径
-        runningPriority = toRun.priority;
-    }
-    void scheduler(){
-        PCB running=getRunningP();
-        PCB highP=null;
-        //找到最高优先级的就绪进程p
-        for(int i=2;i>=0;i--){
-            if(readyListHeads[i]==null){
-                continue;
-            }
-            else{
-                if(readyListHeads[i].Status==2 && readyListHeads[i].next!=null){
-                    //第一个进程正在运行，选择他的下一个就绪进程
-                    highP = readyListHeads[i].next;
-                    break;
-                }else{
-                    //第一个ready的进程 | 队列里只有这唯一一个正在运行的进程
-                    highP = readyListHeads[i];
-                    break;
-                }
-            }
-        }
-        //仅当没有多余进程且
-        //判断三个条件，是否让p抢占
-        if(runningPriority<highP.priority||running==null||running.Status!=2){
-            //条件1：存在更高优先级进程
-            //条件2：运行进程状态已经变化，让一个优先级次之的就绪进程代替
-            //条件3：没有正在运行的进程，让优先级次之的代替
-            preempt(running,highP);
-            //抢占需要确保更改上一个已运行进程Status变化，并且移动他到队列最后；runningPrio也要变化
-        }
-        System.out.println(getRunningP().PName+" isRunning Priority："+runningPriority);
-        //输出运行进程名
-    }
     void init(String[] ins){
         RCB r1 = new RCB(0,"R1",1);
         RCB r2 = new RCB(1,"R2",2);
@@ -98,11 +29,9 @@ public class PM{
         processList.add(0,PInit);//记入一张总的进程列表中
         readyListHeads= new PCB[3];
         readyListHeads[0]=PInit; //记入就绪列表 且是正在运行
-        //blockListHead=null;
         runningPriority=0;
         System.out.println("Init Successfully");
-    };
-
+    }
     void cr(String[] ins){
         PCB runningP = getRunningP();
         PCB customProgress = new PCB(ins[1],Integer.parseInt(ins[2]),runningP);
@@ -113,7 +42,7 @@ public class PM{
         processList.add(customProgress);
         System.out.println("Create Successfully");
         scheduler();
-    };
+    }
     void de(String[] ins){
         String name=ins[1];
         Iterator<PCB> it=processList.iterator();
@@ -122,13 +51,13 @@ public class PM{
             if(name.equals(target.PName)){
                 //递归消灭进程以及子进程
                 killP(target);
-                //从其父节点的孩子中删去自己
+                //从其父节点的孩子列表中删去自己
                 target.parent.child.remove(target);
                 break;
-            };
+            }
         }
         scheduler();
-    };
+    }
     void req(String[] ins){
         PCB runningP=getRunningP();
         RCB r = resMap.get(ins[1]);
@@ -144,22 +73,19 @@ public class PM{
             }else {
                 System.out.println("可用资源不足");
             }
-
             //PM readyList update
             readyListHeads[runningPriority]=runningP.next;
             //PCB update
             runningP.blocked(r,need);
             //RCB update
-            r.blocked.add(r.blocked.size(),runningP);  //add(index,object)???
-
+            r.blocked.add(r.blocked.size(),runningP);
         }
         scheduler();
-    };
+    }
     void rel(String[] ins){
         PCB running = getRunningP();
         RCB r = resMap.get(ins[1]);
         int releaseNum= Integer.parseInt(ins[2]);
-
         //释放资源，更新PCB,RCB
         if(running.resOwned[r.RID]>=releaseNum && releaseNum>0){
             running.resOwned[r.RID]-=releaseNum;
@@ -168,9 +94,8 @@ public class PM{
         }else{
             System.out.println("释放资源数目错误");
         }
-
         scheduler();
-    };
+    }
     void to(String[] ins){
         PCB runningP = getRunningP();
         if(runningP!=null){
@@ -179,7 +104,7 @@ public class PM{
             insertAtLast(runningP);
         }
         scheduler();
-    };
+    }
     void list(String[] ins){
         System.out.println("-----------------");
         Iterator<PCB> it = processList.iterator();
@@ -194,7 +119,7 @@ public class PM{
             System.out.println("RName-"+r.RName+" : NowAvailable-"+r.availableNumber+"/"+r.totalNumber);
         }
         System.out.println("-----------------");
-    };
+    }
     void pr(String[] ins){
         System.out.println("-----------------");
         //用户先用list获取所需的pid，再利用pid使用pr指令详细查询
@@ -221,9 +146,7 @@ public class PM{
             System.out.println("ChildProcess: NONE");
             System.out.println("-----------------");
         }
-
-    };
-
+    }
     void killP(PCB p){
         //kill所有子节点
         Iterator<PCB> it = p.child.iterator();
@@ -247,10 +170,8 @@ public class PM{
                 p.NumOfRes=0;
             }
         }
-
         //更新PCB
         p.Status=-1;
-
         //释放所有资源，更新RCB
         for(int i = 0;i<4;i++){
             int res=p.resOwned[i];
@@ -259,6 +180,17 @@ public class PM{
             r.availableNumber += res;
             wake(r);
             p.resOwned[i]=0;
+        }
+    }
+
+    PCB getRunningP(){
+        PCB p = readyListHeads[runningPriority];
+        //某就绪队列第一个进程正在运行
+        if(p.Status==2){
+            return p;
+        }else{
+            //System.out.println("no running process");
+            return null;
         }
     }
     void wake(RCB r){
@@ -274,6 +206,61 @@ public class PM{
             insertAtLast(p);
         }
     }
-};
+    void insertAtLast(PCB p){
+        p.Status = 1;
+        p.next=null;
+        int priority=p.priority;
+        PCB ptr = readyListHeads[priority];
+        if(ptr==null){
+            readyListHeads[priority]=p;
+        }
+        else{
+            while(ptr.next!=null){
+                ptr=ptr.next;
+            }
+            ptr.next=p;
+        }
+    }
+    void preempt(PCB running,PCB toRun){
+        //被抢占的进程放到队尾
+        if(running!=null){
+            insertAtLast(running);
+        }
+        toRun.Status=2;
+        //PM更新runningPriority的唯一途径
+        runningPriority = toRun.priority;
+    }
+    void scheduler(){
+        PCB running=getRunningP();
+        PCB highP=null;
+        //找到最高优先级的就绪进程p
+        for(int i=2;i>=0;i--){
+            if(readyListHeads[i]==null){
+                continue;
+            }
+            else{
+                if(readyListHeads[i].Status==2 && readyListHeads[i].next!=null){
+                    //第一个进程正在运行，选择他的下一个就绪进程
+                    highP = readyListHeads[i].next;
+                    break;
+                }else{
+                    //第一个ready的进程 | 队列里只有这唯一一个正在运行的进程
+                    highP = readyListHeads[i];
+                    break;
+                }
+            }
+        }
+        //判断三个条件，是否让p抢占
+        if(runningPriority<highP.priority||running==null||running.Status!=2){
+            //条件1：存在更高优先级进程
+            //条件2：运行进程状态已经变化，让一个优先级次之的就绪进程代替
+            //条件3：没有正在运行的进程，让优先级次之的代替
+            preempt(running,highP);
+            //抢占需要确保更改上一个已运行进程Status变化，并且移动它到队列最后；runningPrio也要变化
+        }
+        System.out.println(getRunningP().PName+" isRunning Priority："+runningPriority);
+        //输出运行进程名
+    }
+}
 
 
